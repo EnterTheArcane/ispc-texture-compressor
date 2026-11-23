@@ -1,78 +1,36 @@
-# DISCONTINUATION OF PROJECT #  
-This project will no longer be maintained by Intel.  
-Intel has ceased development and contributions including, but not limited to, maintenance, bug fixes, new releases, or updates, to this project.  
-Intel no longer accepts patches to this project.  
- If you have an ongoing need to use this project, are interested in independently developing it, or would like to maintain patches for the open source software community, please create your own fork of this project.  
-  
-# Fast ISPC Texture Compressor
+# ISPC Texture Compressor
 
-This repository contains a texture compression library for the following
-formats:
+SIMD CPU compression for BC1, BC3, BC4, BC5, BC6H, BC7, ETC1, and LDR ASTC up to 8×8 blocks. Input dimensions must be multiples of the block size. Use `ReplicateBorders` for edge padding. See [ispc_texcomp.h](include/ispc_texcomp.h) for input layouts and output buffer sizes.
 
-* BC6H (FP16 HDR input)
-* BC7
-* ASTC (LDR, block sizes up to 8x8)
-* ETC1
-* BC1, BC3 (aka DXT1, DXT5) and BC4, BC5 (aka ATI1N, ATI2N)
+## Build and Install
 
-The library uses the [ISPC compiler](https://ispc.github.io/) to generate CPU
-SIMD-optimized compression algorithms.  For more information, see the [Fast ISPC
-Texture
-Compressor](https://software.intel.com/en-us/articles/fast-ispc-texture-compressor-update)
-article on Intel Developer Zone.
+Use CMake 3.31+, C++11 or later, and [ISPC 1.32+](https://ispc.github.io/downloads.html). Put the host ISPC compiler on `PATH` or set `CMAKE_ISPC_COMPILER`. Choose a generator with native ISPC support, such as Ninja, Unix Makefiles, or NMake Makefiles. For MSVC, configure from a developer prompt for the target architecture.
+
+~~~sh
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+cmake --install build --prefix build/install
+~~~
+
+Static is the default. Use `-DBUILD_SHARED_LIBS=ON` for a shared library on native targets.
+
+Add the install prefix to `CMAKE_PREFIX_PATH` to consume the installed package.
+
+~~~cmake
+find_package(ispc-texture-compressor CONFIG REQUIRED)
+target_link_libraries(my_app PRIVATE ispc-texture-compressor::ispc-texture-compressor)
+~~~
+
+The same target is available through `add_subdirectory()`. Include `<ispc_texcomp.h>`. Define `ISPC_TEXCOMP_SHARED` if you link a shared build without the CMake target.
+
+## Target Toolchains
+
+Check `ispc --support-matrix` for your compiler's available targets. Use `CMAKE_ISPC_INSTRUCTION_SETS` to override the native ISA list.
+
+- **Apple builds** accept one `CMAKE_OSX_ARCHITECTURES` value per build tree. For iOS, use an iOS-capable compiler and set `CMAKE_SYSTEM_NAME=iOS`, `CMAKE_OSX_ARCHITECTURES=arm64`, and `CMAKE_OSX_SYSROOT` to `iphoneos` or `iphonesimulator`.
+- **Android** uses the NDK's `android.toolchain.cmake` with `ANDROID_ABI=x86_64` or `arm64-v8a`.
+- **Emscripten** builds are static and require SIMD and an ISPC compiler built with `WASM_ENABLED=ON`. Configure with `emcmake`. For wasm64, set both `CMAKE_C_FLAGS` and `CMAKE_CXX_FLAGS` to `-m64`.
 
 ## License
 
-Copyright 2017-2023 Intel Corporation
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-of the Software, and to permit persons to whom the Software is furnished to do
-so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-## Contributing
-
-Please see
-[CONTRIBUTING](https://github.com/GameTechDev/ISPCTextureCompressor/blob/master/contributing.md)
-for information on how to request features, report issues, or contribute code
-changes.
-
-## Build Instructions
-
-Binaries for ISPC v1.9.2 need to be obtained separately (e.g., from [the ISPC
-repo](https://ispc.github.io/downloads.html) or [the SourceForge
-mirror](http://sourceforge.net/projects/ispcmirror/files/v1.9.2/)).  Download
-the appropriate compiler for your target, and place the binary in the following
-directories:
-
- - ISPC/linux/
- - ISPC/osx/
- - ISPC/win/
-
-Source for the ISPC Texture Compressor library is under `ispc_texcomp/`.
-
-#### Windows
-
-* The build projects use Visual Studio 2017, Windows Tools 1.4.1, and the Windows 10 April 2018 Update SDK (17134)
-* Use `ispc_texcomp\ispc_texcomp.vcxproj` to build the ISPC Texture Compressor library
-
-#### Mac OS X:
-* The build has been tested with Xcode 7.3 with minimum OS X deployment version set to 10.9
-* Use `ispc_texcomp.xcodeproj` to build the ISPC Texture Compressor library
- * dylib install name is set to `@executable_path/../Frameworks/$(EXECUTABLE_PATH)`
-
-#### Linux:
-* Use `make -f Makefile.linux` to build the ISPC Texture Compressor library
+Copyright 2017–2023 Intel Corporation. Distributed under the [MIT license](license.txt).

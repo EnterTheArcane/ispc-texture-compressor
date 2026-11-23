@@ -1,0 +1,4 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/ispc_texcomp_targets.cmake")
+check_required_components(ispc-texture-compressor)
