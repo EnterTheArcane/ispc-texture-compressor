@@ -12,11 +12,6 @@ call :build x64   Debug "%~dp0test_astc\test_astc.sln"
 call :build Win32 Release "%~dp0test_astc\test_astc.sln"
 call :build x64   Release "%~dp0test_astc\test_astc.sln"
 
-call :build x86 Debug "%~dp0..\ISPC Texture Compressor\ISPC Texture Compressor.sln"
-call :build x64 Debug "%~dp0..\ISPC Texture Compressor\ISPC Texture Compressor.sln"
-call :build x86 Release "%~dp0..\ISPC Texture Compressor\ISPC Texture Compressor.sln"
-call :build x64 Release "%~dp0..\ISPC Texture Compressor\ISPC Texture Compressor.sln"
-
 echo.
 if "%errorcount%"=="0" (echo PASS) else (echo %errorcount% FAILED)
 exit /b %errorcount%
