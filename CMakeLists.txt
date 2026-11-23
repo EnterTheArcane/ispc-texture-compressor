@@ -5,6 +5,7 @@ project(ispc-texture-compressor LANGUAGES CXX)
 include(GNUInstallDirs)
 
 option(BUILD_SHARED_LIBS "Build as a shared library" OFF)
+option(BUILD_TESTING "Build tests" OFF)
 
 if(PROJECT_IS_TOP_LEVEL)
     get_property(is_multi_confiig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
@@ -175,6 +176,11 @@ endif()
 
 if(ispc_texcomp_target_os STREQUAL "web")
     target_link_options(ispc_texcomp INTERFACE -msimd128)
+endif()
+
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
 
 include(CMakePackageConfigHelpers)
