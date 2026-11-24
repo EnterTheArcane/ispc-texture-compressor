@@ -114,33 +114,42 @@ struct rgba_surface
 	int width, height, stride;
 };
 
-inline void load_block_interleaved(float block[48], uniform rgba_surface* uniform src, int xx, uniform int yy)
+inline uniform bool full_block_group()
 {
-    for (uniform int y = 0; y<4; y++)
-    for (uniform int x = 0; x<4; x++)
-    {
-        uniform unsigned int32* uniform src_ptr = (unsigned int32*)&src->ptr[(yy * 4 + y)*src->stride];
-        unsigned int32 rgba = gather_uint(src_ptr, xx * 4 + x);
-
-        block[16 * 0 + y * 4 + x] = (int)((rgba >> 0) & 255);
-        block[16 * 1 + y * 4 + x] = (int)((rgba >> 8) & 255);
-        block[16 * 2 + y * 4 + x] = (int)((rgba >> 16) & 255);
-    }
+    // The layout conversion intrinsics access every lane, regardless of the mask.
+    return (uint64)lanemask() == (~0ull >> (64 - programCount));
 }
 
-inline void load_block_interleaved_rgba(float block[64], uniform rgba_surface* uniform src, int xx, uniform int yy)
+inline void load_ldr_block(
+    float block[],
+    uniform rgba_surface* uniform src,
+    int xx,
+    uniform int yy,
+    uniform int channels,
+    uniform bool full_group)
 {
-	for (uniform int y=0; y<4; y++)
-	for (uniform int x=0; x<4; x++)
-	{
-		uniform unsigned int32* uniform src_ptr = (unsigned int32*)&src->ptr[(yy*4+y)*src->stride];
-		unsigned int32 rgba = gather_uint(src_ptr, xx*4+x);
+    for (uniform int y = 0; y < 4; y++)
+    {
+        uniform int32* uniform row = (uniform int32* uniform)&src->ptr[(yy * 4 + y) * src->stride];
+        int32 pixels[4];
+        if (full_group)
+        {
+            aos_to_soa4(row + 4 * extract(xx, 0), &pixels[0], &pixels[1], &pixels[2], &pixels[3]);
+        }
+        else
+        {
+            for (uniform int x = 0; x < 4; x++)
+            {
+                pixels[x] = (int32)gather_uint((uniform uint32* uniform)row, xx * 4 + x);
+            }
+        }
 
-		block[16*0+y*4+x] = (int)((rgba>> 0)&255);
-		block[16*1+y*4+x] = (int)((rgba>> 8)&255);
-		block[16*2+y*4+x] = (int)((rgba>>16)&255);
-		block[16*3+y*4+x] = (int)((rgba>>24)&255);
-	}
+        for (uniform int x = 0; x < 4; x++)
+        for (uniform int p = 0; p < channels; p++)
+        {
+            block[16 * p + y * 4 + x] = (int)(((uint32)pixels[x] >> (8 * p)) & 255);
+        }
+    }
 }
 
 inline void load_block_interleaved_16bit(float block[48], uniform rgba_surface* uniform src, int xx, uniform int yy)
@@ -204,6 +213,33 @@ inline void store_data(uniform uint8 dst[], int width, int xx, uniform int yy, u
 		uniform uint32* dst_ptr = (uint32*)&dst[(yy)*width*data_size];
 		scatter_uint(dst_ptr, xx*data_size+k, data[k]);
 	}
+}
+
+inline void store_block(
+    uniform uint8 dst[],
+    uniform int width,
+    int xx,
+    uniform int yy,
+    uint32 data[],
+    uniform int data_size,
+    uniform bool full_group)
+{
+    if (!full_group)
+    {
+        store_data(dst, width, xx, yy, data, data_size);
+        return;
+    }
+
+    uniform int32* uniform row = (uniform int32* uniform)&dst[yy * width * data_size];
+    uniform int32* uniform blocks = row + extract(xx, 0) * data_size;
+    if (data_size == 2)
+    {
+        soa_to_aos2((int32)data[0], (int32)data[1], blocks);
+    }
+    else
+    {
+        soa_to_aos4((int32)data[0], (int32)data[1], (int32)data[2], (int32)data[3], blocks);
+    }
 }
 
 inline void ssymv(float a[3], float covar[6], float b[3])
@@ -619,27 +655,25 @@ inline void CompressBlockBC3_alpha(float block[16], uint32 data[2])
 
 inline void CompressBlockBC1(uniform rgba_surface src[], int xx, uniform int yy, uniform uint8 dst[])
 {
-	float block[48];
+    float block[48];
     uint32 data[2];
 
-	load_block_interleaved(block, src, xx, yy);
-	
+    uniform bool full_group = full_block_group();
+    load_ldr_block(block, src, xx, yy, 3, full_group);
     CompressBlockBC1_core(block, data);
-
-	store_data(dst, src->width, xx, yy, data, 2);
+    store_block(dst, src->width, xx, yy, data, 2, full_group);
 }
 
 inline void CompressBlockBC3(uniform rgba_surface src[], int xx, uniform int yy, uniform uint8 dst[])
 {
-	float block[64];
+    float block[64];
     uint32 data[4];
 
-	load_block_interleaved_rgba(block, src, xx, yy);
-	
+    uniform bool full_group = full_block_group();
+    load_ldr_block(block, src, xx, yy, 4, full_group);
     CompressBlockBC3_alpha(&block[48], &data[0]);
     CompressBlockBC1_core(block, &data[2]);
-
-	store_data(dst, src->width, xx, yy, data, 4);
+    store_block(dst, src->width, xx, yy, data, 4, full_group);
 }
 
 inline void CompressBlockBC4(uniform rgba_surface src[], int xx, uniform int yy, uniform uint8 dst[])
@@ -651,7 +685,7 @@ inline void CompressBlockBC4(uniform rgba_surface src[], int xx, uniform int yy,
 	
     CompressBlockBC3_alpha(block, data);
 
-	store_data(dst, src->width, xx, yy, data, 2);
+	store_block(dst, src->width, xx, yy, data, 2, full_block_group());
 }
 
 inline void CompressBlockBC5(uniform rgba_surface src[], int xx, uniform int yy, uniform uint8 dst[])
@@ -664,7 +698,7 @@ inline void CompressBlockBC5(uniform rgba_surface src[], int xx, uniform int yy,
     CompressBlockBC3_alpha(block, data);
     CompressBlockBC3_alpha(&block[16], &data[2]);
 
-	store_data(dst, src->width, xx, yy, data, 4);
+	store_block(dst, src->width, xx, yy, data, 4, full_block_group());
 }
 
 export void CompressBlocksBC1_ispc(uniform rgba_surface src[], uniform uint8 dst[])
@@ -2108,7 +2142,7 @@ inline void CompressBlockBC7(uniform rgba_surface src[], int xx, uniform int yy,
 	varying bc7_enc_state* uniform state = &_state;
 
     bc7_enc_copy_settings(state, settings);
-	load_block_interleaved_rgba(state->block, src, xx, yy);
+	load_ldr_block(state->block, src, xx, yy, 4, false);
 	state->best_err = 1e99;
 	state->opaque_err = compute_opaque_err(state->block, state->channels);
 
@@ -3763,7 +3797,7 @@ inline void CompressBlockETC1(uniform rgba_surface src[], int xx, uniform int yy
     varying etc_enc_state* uniform state = &_state;
 
     etc_enc_copy_settings(state, settings);
-    load_block_interleaved(state->block, src, xx, yy);
+    load_ldr_block(state->block, src, xx, yy, 3, false);
     state->best_err = 1e99;
 
     CompressBlockETC1_core(state);

@@ -71,8 +71,11 @@ int main()
 
     const rgba_surface surface{pixels.data(), width, height, stride};
     std::array<uint8_t, size> output{};
+    CompressBlocksBC1(&surface, output.data());
+    bool passed = check("BC1", output.data(), size / 2, 0x65042e91cc9ebac8ULL);
+
     CompressBlocksBC3(&surface, output.data());
-    bool passed = check("BC3", output.data(), size, 0xfd0e4281649dd1b7ULL);
+    passed = check("BC3", output.data(), size, 0xfd0e4281649dd1b7ULL) && passed;
 
     bc7_enc_settings bc7;
     GetProfile_alpha_basic(&bc7);
