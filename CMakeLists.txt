@@ -68,7 +68,8 @@ endif()
 set(ispc_texcomp_compiler_options
     "--arch=${ispc_texcomp_arch}"
     "--target-os=${ispc_texcomp_target_os}"
-    --opt=fast-math
+    # Keep rounding the same across runtime dispatch targets.
+    --opt=disable-fma
 )
 
 if(ispc_texcomp_target_os STREQUAL "web")

@@ -12,7 +12,7 @@ cmake --build build
 cmake --install build --prefix build/install
 ~~~
 
-Static is the default. Use `-DBUILD_SHARED_LIBS=ON` for a shared library on native targets. To run the ASTC test, configure with `-DBUILD_TESTING=ON`, build, then run `ctest --test-dir build --output-on-failure`.
+Static is the default. Use `-DBUILD_SHARED_LIBS=ON` for a shared library on native targets. To run the tests, configure with `-DBUILD_TESTING=ON`, build, then run `ctest --test-dir build --output-on-failure`.
 
 Add the install prefix to `CMAKE_PREFIX_PATH` to consume the installed package.
 
@@ -23,11 +23,11 @@ target_link_libraries(my_app PRIVATE ispc-texture-compressor::ispc-texture-compr
 
 The same target is available through `add_subdirectory()`. Include `<ispc_texcomp.h>`. Define `ISPC_TEXCOMP_SHARED` if you link a shared build without the CMake target.
 
-When embedding with `BUILD_TESTING=ON`, enable CTest at the parent root to discover the test there.
+When embedding with `BUILD_TESTING=ON`, enable CTest at the parent root to discover the tests there.
 
 ## Target Toolchains
 
-Check `ispc --support-matrix` for your compiler's available targets. Use `CMAKE_ISPC_INSTRUCTION_SETS` to override the native ISA list.
+x64 builds dispatch at runtime among SSE2, AVX, and AVX2. The default build uses consistent floating-point operations and ASTC tie-breaking across those targets. ARM64 builds use NEON. Check `ispc --support-matrix` for your compiler's available targets and use `CMAKE_ISPC_INSTRUCTION_SETS` to override the native ISA list.
 
 - **Apple builds** accept one `CMAKE_OSX_ARCHITECTURES` value per build tree. For iOS, use an iOS-capable compiler and set `CMAKE_SYSTEM_NAME=iOS`, `CMAKE_OSX_ARCHITECTURES=arm64`, and `CMAKE_OSX_SYSROOT` to `iphoneos` or `iphonesimulator`.
 - **Android** uses the NDK's `android.toolchain.cmake` with `ANDROID_ABI=x86_64` or `arm64-v8a`.

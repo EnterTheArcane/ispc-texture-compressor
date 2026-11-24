@@ -25,16 +25,12 @@ typedef unsigned int64 uint64;
 
 inline float RCP(float x)
 {
-    return 1.0f/x; // uses rcp when compiled with --opt=fast-math
-    //return rcp(x);
-    //return rcp_fast(x);
+    return 1.0f/x;
 }
 
 inline float RSQRT(float x)
 {
-    return 1.0f/sqrt(x); // uses rsqrt when compiled with --opt=fast-math
-    //return rsqrt(x);
-    //return rsqrt_fast(x);
+    return 1.0f/sqrt(x);
 }    
 
 inline void swap_ints(int u[], int v[], uniform int n)

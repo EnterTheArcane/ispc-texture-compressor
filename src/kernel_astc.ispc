@@ -89,22 +89,12 @@ inline uint32_t gather_uint(const uniform uint32_t* const uniform ptr, int idx)
     return ptr[idx]; // (perf warning expected)
 }
 
-inline float gather_float(uniform float* uniform ptr, int idx)
-{
-    return ptr[idx]; // (perf warning expected)
-}
-
 inline float gather_float(varying float* uniform ptr, int idx)
 {
     return ptr[idx]; // (perf warning expected)
 }
 
 inline void scatter_uint(uniform uint32_t* ptr, int idx, uint32_t value)
-{
-    ptr[idx] = value; // (perf warning expected)
-}
-
-inline void scatter_float(uniform float* uniform ptr, int idx, float value)
 {
     ptr[idx] = value; // (perf warning expected)
 }
@@ -790,6 +780,7 @@ void insert_element(astc_rank_state state[], float error, uint32_t packed_mode, 
     *threshold_error = max_error;
 }
 
+// Each mode has its own bin, so a batch has at most one candidate per output block.
 uniform static const int packed_modes_count = 3334;
 uniform static const uint32_t packed_modes[3334] =
 {
@@ -2219,7 +2210,7 @@ void load_block_parameters(astc_block block[], uint32_t mode, uniform astc_enc_c
     block->endpoint_range = get_bits(mode, 8, 12); // 0..20 <= 2^5
 }
 
-export void astc_encode_ispc(uniform rgba_surface src[], uniform float block_scores[], uniform uint8_t dst[], uniform uint64_t list[], uniform astc_enc_context list_context[], uniform astc_enc_settings settings[])
+export void astc_encode_ispc(uniform rgba_surface src[], uniform uint64_t block_keys[], uniform uint8_t dst[], uniform uint64_t list[], uniform astc_enc_context list_context[], uniform astc_enc_settings settings[])
 {
     uint64_t entry = list[programIndex];
     uint32_t offset = entry >> 32;
@@ -2260,13 +2251,16 @@ export void astc_encode_ispc(uniform rgba_surface src[], uniform float block_sco
     optimize_block(state->scaled_pixels, block, state);
     float error = measure_error(block, state);
     
-    if (error < gather_float(block_scores, yy * tex_width + xx))
+    int block_index = yy * tex_width + xx;
+    // Nonnegative error bits sort numerically. The mode breaks ties across batch widths.
+    uint64_t key = ((uint64_t)intbits(error) << 32) | mode;
+    if (key < block_keys[block_index])
     {
         pack_block(block, state);
 
-        scatter_float(block_scores, yy * tex_width + xx, error);
+        block_keys[block_index] = key;
 
         for (uniform int i = 0; i < 4; i++)
-            scatter_uint((uint32_t*)dst, (yy * tex_width + xx) * 4 + i, state->data[i]);
+            scatter_uint((uint32_t*)dst, block_index * 4 + i, state->data[i]);
     }
 }

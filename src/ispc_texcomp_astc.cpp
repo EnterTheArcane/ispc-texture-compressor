@@ -19,7 +19,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
-#include <limits>
 #include <vector>
 
 void GetProfile_astc_fast(astc_enc_settings* settings, int block_width, int block_height)
@@ -486,14 +485,14 @@ void setup_list_context(ispc::astc_enc_context* ctx, uint32_t packed_mode)
     ctx->channels = (color_endpoint_modes0 > 8) ? 4 : 3;
 }
 
-void astc_encode(const rgba_surface* src, float* block_scores, uint8_t* dst, uint64_t* list, astc_enc_settings* settings)
+void astc_encode(const rgba_surface* src, uint64_t* block_keys, uint8_t* dst, uint64_t* list, astc_enc_settings* settings)
 {
     ispc::astc_enc_context list_context;
     setup_list_context(&list_context, uint32_t(list[1] & 0xFFFFFFFF));
 
     assert(sizeof(ispc::rgba_surface) == sizeof(rgba_surface));
     assert(sizeof(ispc::astc_enc_settings) == sizeof(astc_enc_settings));
-    ispc::astc_encode_ispc((ispc::rgba_surface*)src, block_scores, dst, list, &list_context, (ispc::astc_enc_settings*)settings);
+    ispc::astc_encode_ispc((ispc::rgba_surface*)src, block_keys, dst, list, &list_context, (ispc::astc_enc_settings*)settings);
 }
 
 void CompressBlocksASTC(const rgba_surface* src, uint8_t* dst, astc_enc_settings* settings)
@@ -507,13 +506,9 @@ void CompressBlocksASTC(const rgba_surface* src, uint8_t* dst, astc_enc_settings
     int tex_width = src->width / settings->block_width;
     int programCount = ispc::get_programCount();
 
-    std::vector<float> block_scores(tex_width * src->height / settings->block_height);
-
-    for (int yy = 0; yy < src->height / settings->block_height; yy++)
-    for (int xx = 0; xx < tex_width; xx++)
-    {
-        block_scores[yy * tex_width + xx] = std::numeric_limits<float>::infinity();
-    }
+    // Positive infinity in the high word rejects non-finite errors.
+    constexpr uint64_t initial_block_key = 0x7f80000000000000ULL;
+    std::vector<uint64_t> block_keys(tex_width * (src->height / settings->block_height), initial_block_key);
 
     int mode_list_size = 3334;
     int list_size = programCount;
@@ -547,7 +542,7 @@ void CompressBlocksASTC(const rgba_surface* src, uint8_t* dst, astc_enc_settings
             {
                 mode_list[0] = (uint64_t(offset) << 32) + mode;
 
-                astc_encode(src, block_scores.data(), dst, mode_list, settings);
+                astc_encode(src, block_keys.data(), dst, mode_list, settings);
                 memset(mode_list, 0, list_size * sizeof(uint64_t));
             }                
         }
@@ -559,7 +554,7 @@ void CompressBlocksASTC(const rgba_surface* src, uint8_t* dst, astc_enc_settings
         if (mode_list[0] == 0) continue;
         mode_list[0] = 0;
 
-        astc_encode(src, block_scores.data(), dst, mode_list, settings);
+        astc_encode(src, block_keys.data(), dst, mode_list, settings);
         memset(mode_list, 0, list_size * sizeof(uint64_t));
     }
 }
