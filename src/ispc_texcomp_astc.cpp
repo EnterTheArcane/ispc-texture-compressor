@@ -461,11 +461,6 @@ void pack_block(uint32_t data[4], astc_block* block)
     for (int i = 0; i < 4; i++) data[i] |= reverse_bits_32(rdata[3 - i]);    
 }
 
-void atsc_rank(const rgba_surface* src, int xx, int yy, uint32_t* mode_buffer, astc_enc_settings* settings)
-{
-    ispc::astc_rank_ispc((ispc::rgba_surface*)src, xx, yy, mode_buffer, (ispc::astc_enc_settings*)settings);
-}
-
 extern "C" void pack_block_c(uint32_t data[4], ispc::astc_block* block)
 {
     assert(sizeof(ispc::astc_block) == sizeof(astc_block));
@@ -510,7 +505,11 @@ void CompressBlocksASTC(const rgba_surface* src, uint8_t* dst, astc_enc_settings
     constexpr uint64_t initial_block_key = 0x7f80000000000000ULL;
     std::vector<uint64_t> block_keys(tex_width * (src->height / settings->block_height), initial_block_key);
 
-    int mode_list_size = 3334;
+    constexpr int mode_list_size = 3334;
+    uint32_t eligible_modes[mode_list_size];
+    auto* ispc_src = reinterpret_cast<ispc::rgba_surface*>(const_cast<rgba_surface*>(src));
+    auto* ispc_settings = reinterpret_cast<ispc::astc_enc_settings*>(settings);
+    const int eligible_count = ispc::astc_filter_modes(eligible_modes, ispc_settings);
     int list_size = programCount;
     std::vector<uint64_t> mode_lists(list_size * mode_list_size);
     std::vector<uint32_t> mode_buffer(programCount * settings->fastSkipTreshold);
@@ -519,7 +518,7 @@ void CompressBlocksASTC(const rgba_surface* src, uint8_t* dst, astc_enc_settings
     for (int _x = 0; _x < (tex_width + programCount - 1) / programCount; _x++)
     {
         int xx = _x * programCount;
-        atsc_rank(src, xx, yy, mode_buffer.data(), settings);
+        ispc::astc_rank_ispc(ispc_src, xx, yy, mode_buffer.data(), eligible_modes, eligible_count, ispc_settings);
         
         for (int i = 0; i < settings->fastSkipTreshold; i++)
         for (int k = 0; k < programCount; k++)
@@ -548,8 +547,9 @@ void CompressBlocksASTC(const rgba_surface* src, uint8_t* dst, astc_enc_settings
         }
     }
 
-    for (int mode_bin = 0; mode_bin < mode_list_size; mode_bin++)
+    for (int i = 0; i < eligible_count; i++)
     {
+        int mode_bin = eligible_modes[i] >> 20;
         uint64_t* mode_list = &mode_lists[list_size * mode_bin];
         if (mode_list[0] == 0) continue;
         mode_list[0] = 0;

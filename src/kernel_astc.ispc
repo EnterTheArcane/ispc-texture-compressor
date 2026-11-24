@@ -1223,7 +1223,31 @@ void load_mode_parameters(uniform astc_mode* uniform mode, uniform uint32_t pack
     mode->endpoint_range = get_bits(packed_mode, 8, 12); // 0..20 <= 2^5
 }
 
-export void astc_rank_ispc(uniform rgba_surface src[], uniform int xx, uniform int yy, uniform uint32_t mode_buffer[], uniform astc_enc_settings settings[])
+export uniform int astc_filter_modes(uniform uint32_t eligible_modes[], uniform astc_enc_settings settings[])
+{
+    uniform int count = 0;
+    for (uniform int id = 0; id < packed_modes_count; id++)
+    {
+        uniform uint32_t packed_mode = packed_modes[id];
+        uniform astc_mode mode;
+        load_mode_parameters(&mode, packed_mode);
+
+        if (mode.height > settings->block_height || mode.width > settings->block_width) continue;
+        if (settings->channels == 3 && mode.color_endpoint_modes[0] > 8) continue;
+
+        eligible_modes[count++] = packed_mode;
+    }
+    return count;
+}
+
+export void astc_rank_ispc(
+    uniform rgba_surface src[],
+    uniform int xx,
+    uniform int yy,
+    uniform uint32_t mode_buffer[],
+    uniform const uint32_t eligible_modes[],
+    uniform int eligible_count,
+    uniform astc_enc_settings settings[])
 {
     int tex_width = src->width / settings->block_width;
     if (xx + programIndex >= tex_width) return;
@@ -1245,18 +1269,13 @@ export void astc_rank_ispc(uniform rgba_surface src[], uniform int xx, uniform i
     float threshold_error = 0;
     int count = -1;
 
-    for (uniform int id = 0; id < packed_modes_count; id++)
+    for (uniform int id = 0; id < eligible_count; id++)
     {
-        uniform uint32_t packed_mode = packed_modes[id];
+        uniform uint32_t packed_mode = eligible_modes[id];
 
         uniform astc_mode _mode;
         uniform astc_mode* uniform mode = &_mode;
         load_mode_parameters(mode, packed_mode);
-
-        if (mode->height > state->block_height) continue;
-        if (mode->width > state->block_width) continue;
-
-        if (settings->channels == 3 && mode->color_endpoint_modes[0] > 8) continue;
 
         float error = estimate_error(state, mode);
         count += 1;
@@ -2210,7 +2229,13 @@ void load_block_parameters(astc_block block[], uint32_t mode, uniform astc_enc_c
     block->endpoint_range = get_bits(mode, 8, 12); // 0..20 <= 2^5
 }
 
-export void astc_encode_ispc(uniform rgba_surface src[], uniform uint64_t block_keys[], uniform uint8_t dst[], uniform uint64_t list[], uniform astc_enc_context list_context[], uniform astc_enc_settings settings[])
+export void astc_encode_ispc(
+    uniform rgba_surface src[],
+    uniform uint64_t block_keys[],
+    uniform uint8_t dst[],
+    uniform uint64_t list[],
+    uniform astc_enc_context list_context[],
+    uniform astc_enc_settings settings[])
 {
     uint64_t entry = list[programIndex];
     uint32_t offset = entry >> 32;
