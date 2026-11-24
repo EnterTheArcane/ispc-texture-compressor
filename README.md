@@ -37,4 +37,4 @@ Cross-compiled tests use `CMAKE_CROSSCOMPILING_EMULATOR`. The Emscripten toolcha
 
 ## License
 
-Copyright 2017–2023 Intel Corporation. Distributed under the [MIT license](license.txt).
+Copyright 2017–2023 Intel Corporation. Distributed under the [MIT license](LICENSE.txt).

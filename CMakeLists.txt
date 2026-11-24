@@ -207,6 +207,6 @@ install(
     DESTINATION "${ispc_texcomp_package_dir}"
 )
 install(
-    FILES license.txt
+    FILES LICENSE.txt
     DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/ispc-texture-compressor"
 )
