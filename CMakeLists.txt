@@ -65,6 +65,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT ispc_texcomp_arch STREQUAL "aarch64"
     message(FATAL_ERROR "iOS builds require CMAKE_OSX_ARCHITECTURES=arm64.")
 endif()
 
+if(CMAKE_ISPC_INSTRUCTION_SETS AND NOT ispc_texcomp_target_os STREQUAL "web")
+    set(ispc_texcomp_instruction_sets ${CMAKE_ISPC_INSTRUCTION_SETS})
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND ispc_texcomp_apple_sdk MATCHES "iphonesimulator")
+    set(ispc_texcomp_ios_simulator ON)
+    list(LENGTH ispc_texcomp_instruction_sets ispc_texcomp_instruction_set_count)
+    if(NOT ispc_texcomp_instruction_set_count EQUAL 1)
+        message(FATAL_ERROR "Set a single ISPC target in CMAKE_ISPC_INSTRUCTION_SETS for iOS simulator builds.")
+    endif()
+endif()
+
 set(ispc_texcomp_compiler_options
     "--arch=${ispc_texcomp_arch}"
     "--target-os=${ispc_texcomp_target_os}"
@@ -131,7 +143,7 @@ if(UNIX AND NOT ispc_texcomp_target_os STREQUAL "web")
     )
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND ispc_texcomp_apple_sdk MATCHES "iphonesimulator")
+if(ispc_texcomp_ios_simulator)
     # ISPC emits iOS device objects. The Apple assembler sets the simulator platform.
     enable_language(ASM)
     target_include_directories(ispc_texcomp PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/ispc/$<CONFIG>")
@@ -144,7 +156,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND ispc_texcomp_apple_sdk MATCHES "iphonesi
             OUTPUT "${assembly}" "${header}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${output_dir}"
             COMMAND "${CMAKE_ISPC_COMPILER}" ${ispc_texcomp_compiler_options}
-                --target=neon-i32x4 --darwin-version-min= --emit-asm --pic
+                "--target=${ispc_texcomp_instruction_sets}" --darwin-version-min= --emit-asm --pic
                 "$<IF:$<CONFIG:Debug>,-O0,-O2>" "$<$<CONFIG:Debug,RelWithDebInfo>:-g>"
                 -h "${header}" -o "${assembly}" "${input}"
             DEPENDS "${input}" "${CMAKE_ISPC_COMPILER}"
@@ -156,9 +168,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND ispc_texcomp_apple_sdk MATCHES "iphonesi
 else()
     if(APPLE AND CMAKE_OSX_DEPLOYMENT_TARGET)
         list(APPEND ispc_texcomp_compiler_options "--darwin-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
-    endif()
-    if(CMAKE_ISPC_INSTRUCTION_SETS AND NOT ispc_texcomp_target_os STREQUAL "web")
-        set(ispc_texcomp_instruction_sets ${CMAKE_ISPC_INSTRUCTION_SETS})
     endif()
     set_property(
         TARGET ispc_texcomp

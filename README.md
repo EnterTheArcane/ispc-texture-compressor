@@ -27,8 +27,9 @@ When embedding with `BUILD_TESTING=ON`, enable CTest at the parent root to disco
 
 ## Target Toolchains
 
-x64 builds dispatch at runtime among SSE2, AVX, AVX2, and AVX-512. The default build uses consistent floating-point operations and ASTC tie-breaking across those targets. ARM64 builds use NEON. Check `ispc --support-matrix` for your compiler's available targets and use `CMAKE_ISPC_INSTRUCTION_SETS` to override the native ISA list.
+x64 builds dispatch at runtime among SSE2, AVX, AVX2, and AVX-512. The default build uses consistent floating-point operations and ASTC tie-breaking across those targets. Check `ispc --support-matrix` for your compiler's available targets and use `CMAKE_ISPC_INSTRUCTION_SETS` to override the native ISA list.
 
+- **ARM64** defaults to `neon-i32x4`. For bulk encoding on Apple Silicon, select eight lanes with `-DCMAKE_ISPC_INSTRUCTION_SETS=neon-i32x8`.
 - **Apple builds** accept one `CMAKE_OSX_ARCHITECTURES` value per build tree. For iOS, use an iOS-capable compiler and set `CMAKE_SYSTEM_NAME=iOS`, `CMAKE_OSX_ARCHITECTURES=arm64`, and `CMAKE_OSX_SYSROOT` to `iphoneos` or `iphonesimulator`.
 - **Android** uses the NDK's `android.toolchain.cmake` with `ANDROID_ABI=x86_64` or `arm64-v8a`.
 - **Emscripten** builds are static and require SIMD and an ISPC compiler built with `WASM_ENABLED=ON`. Configure with `emcmake`. For wasm64, set both `CMAKE_C_FLAGS` and `CMAKE_CXX_FLAGS` to `-m64`.
